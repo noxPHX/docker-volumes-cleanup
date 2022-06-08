@@ -4,13 +4,13 @@ set -e          # Stop the script on errors
 set -u          # Unset variables are an error
 set -o pipefail # Piping a failed process into a successful one is an error
 
-# Check the script is run as by a user with docker's rights
+# Check the script is run as root
 if [ "$EUID" -ne 0 ]; then
-  if ! id -nGz "$USER" | grep -qzxF docker; then
-    echo "Please run with docker's rights (either run as root or add yourself to the docker group)"
-    exit 1
-  fi
+  echo "Please run as root"
+  exit 1
 fi
+
+initial_size="$(du -s /var/lib/docker/volumes | awk '{print $1}')"
 
 dangling_volumes="$(docker volume ls -q -f dangling=true | grep -E '^[a-z0-9]{64}$')"
 
@@ -27,4 +27,9 @@ fi
 
 docker volume rm $dangling_volumes
 
-echo "Done"
+reduced_size="$(du -s /var/lib/docker/volumes | awk '{print $1}')"
+
+difference="$(($initial_size - $reduced_size))"
+
+echo
+echo "Total reclaimed space: ${difference}B ($((difference/1024))MB, $((difference/1024/1024))GB)"
